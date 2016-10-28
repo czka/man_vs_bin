@@ -5,13 +5,9 @@ import re
 
 
 class Package(object):
-    """A rather naive, but useful (at least to me) tool to help identify
-    binaries/scripts and man pages missing each other in an Arch Linux
-    package."""
-
-    def __init__(self, name):
-        self.name = name
-        self.paths = subprocess.check_output(['pacman', '-Qlq', self.name]).\
+    def __init__(self, pname):
+        self.pname = pname
+        self.paths = subprocess.check_output(['pacman', '-Qlq', self.pname]).\
                      decode('UTF-8').split('\n')[:-1]
 
     def find_paths(self, regex):
@@ -30,15 +26,36 @@ class Package(object):
         return self.find_paths(regex)
 
 if __name__ == '__main__':
-    # package_name = sys.argv[1]
-    package_name = 'gdal'
-    package = Package(package_name)
-    mans = package.find_man_paths()
-    bins = package.find_bin_paths()
+    import argparse
 
-    print("Example usage - print GDAL package man pages that might be missing "
-          "their respective executables:")
-    print(mans - bins)
-    print()
-    print("And vice-versa:")
-    print(bins - mans)
+    parser = argparse.ArgumentParser(
+        description="Help identify binaries/scripts and man pages missing each "
+                    "other in an Arch Linux package. This tool uses some naive "
+                    "heuristics and only gives the user a hint, not a solid "
+                    "truth.", add_help=False)
+
+    group = parser.add_argument_group("Arguments")
+    group.add_argument("--help", action='store_true',
+                       help="Show this help message and exit.")
+
+    args = parser.parse_known_args()
+    group.add_argument("--package",  metavar='PACKAGE', dest='pname',
+                       type=str, help="Input package name.", required=True)
+
+    if args[0].help:
+        parser.exit(parser.print_help())
+    else:
+        args = parser.parse_args()
+        package = Package(args.pname)
+        mans = package.find_man_paths()
+        bins = package.find_bin_paths()
+
+        if not mans and not bins:
+            print("Seems like it's all in order.\n")
+        else:
+            if mans - bins:
+                print("Possible man pages that might be missing their "
+                      "executables:\n%s\n" % str(mans - bins)[1:-1])
+            if bins - mans:
+                print("Possible executables that might be missing their man "
+                      "pages:\n%s\n" % str(bins - mans)[1:-1])
